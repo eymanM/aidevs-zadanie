@@ -25,76 +25,105 @@ app.use(express.json()); // Middleware do parsowania JSON w body requestu
 
 // --- Endpoint 1: Znajdowanie informacji o badaniu (Tool 1) ---
 app.post('/findResearch', (req, res) => {
-    const searchTerm = req.body.input; // Parametr wyszukiwania od agenta
+     const inputForVerification = req.body.input; // Dla weryfikacji
+     const searchTerm = req.body.params; // Parametr wyszukiwania od agenta
 
-    // Weryfikacja webhooka
+    // Weryfikacja webhooka (używa pola 'input')
+    if (typeof inputForVerification === 'string' && inputForVerification.startsWith('test')) {
+        console.log(`Otrzymano weryfikację: ${inputForVerification}`);
+        return res.json({ output: inputForVerification });
+    }
+    /// Another webhook verification check
     if (typeof searchTerm === 'string' && searchTerm.startsWith('test')) {
         console.log(`Otrzymano weryfikację: ${searchTerm}`);
-        return res.json({ output: searchTerm });
+        return res.json({
+            action: "answer",
+            value: "answer",
+            params: searchTerm
+        });
     }
 
     console.log(`Otrzymano zapytanie /findResearch z params: ${searchTerm}`);
 
-    // Sprawdzenie, czy parametr wyszukiwania został podany
+    // Check if search parameter was provided
     if (!searchTerm || typeof searchTerm !== 'string') {
         console.log("Brak parametru 'params' lub nie jest stringiem.");
-        return res.status(400).json({ output: "Błąd: Oczekiwano parametru 'params' typu string w ciele żądania." });
+        return res.status(400).json({
+            action: "answer",
+            value: "answer",
+            params: "Błąd: Oczekiwano parametru 'params' typu string w ciele żądania."
+        });
     }
 
-    // Logika wyszukiwania badania w polu 'nazwa' (case-insensitive)
+    // Find research by name (case-insensitive)
     const foundResearch = badaniaData.filter(b =>
         b.nazwa.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     let outputData;
     if (foundResearch.length > 0) {
-        // Zwracamy informacje o znalezionych badaniach (może być więcej niż jedno)
-        // Dla zwięzłości zwrócimy tylko pierwsze znalezione lub listę
-        // Przykład dla pierwszego znalezionego:
         const firstResult = foundResearch[0];
         outputData = `Znaleziono badanie pasujące do "${searchTerm}": "${firstResult.nazwa}". ID Uczelni: ${firstResult.uczelnia}, Sponsor: ${firstResult.sponsor}`;
-        // Można też zwrócić listę, jeśli agent ma sobie poradzić z wieloma wynikami:
-        // outputData = foundResearch.map(r => `Badanie: "${r.nazwa}", UczelniaID: ${r.uczelnia}, Sponsor: ${r.sponsor}`).join(' | ');
-
     } else {
         outputData = `Nie znaleziono badania zawierającego "${searchTerm}" w nazwie.`;
     }
 
-    // Ograniczenie długości odpowiedzi
+    // Limit response length
     if (outputData.length > 1024) {
         outputData = outputData.substring(0, 1021) + "...";
     }
 
     console.log(`Odpowiedź /findResearch: ${outputData}`);
-    res.json({ output: outputData });
+    
+    // Return the correct format with "answer" action since we're providing the final result
+    res.json({
+        action: "usetool",
+        value: "tool1",
+        params: outputData
+    });
 });
 
 app.post('/findTeamAndUni', (req, res) => {
-    const universityId = req.body.input;
+     const inputForVerification = req.body.input; // Dla weryfikacji
+     const universityId = req.body.params; // Oczekujemy ID uczelni w params
 
     // Weryfikacja webhooka
+    if (typeof inputForVerification === 'string' && inputForVerification.startsWith('test')) {
+        console.log(`Otrzymano weryfikację: ${inputForVerification}`);
+        return res.json({ output: inputForVerification });
+    }
+
+    // Another webhook verification check
     if (typeof universityId === 'string' && universityId.startsWith('test')) {
         console.log(`Otrzymano weryfikację: ${universityId}`);
-        return res.json({ output: universityId });
+        return res.json({
+            action: "answer",
+            value: "answer",
+            params: universityId
+        });
     }
 
     console.log(`Otrzymano zapytanie /findTeamAndUni z params: ${universityId}`);
 
     if (!universityId || typeof universityId !== 'string') {
         console.log("Brak parametru 'params' lub nie jest stringiem.");
-        return res.status(400).json({ output: "Błąd: Oczekiwano ID uczelni jako 'params' typu string." });
+        return res.status(400).json({
+            action: "answer",
+            value: "answer",
+            params: "Błąd: Oczekiwano ID uczelni jako 'params' typu string."
+        });
     }
 
     let universityName = "Nie znaleziono uczelni o podanym ID.";
     let teamMembers = [];
 
-    // Znajdź nazwę uczelni
+    // Find university name
     const foundUniversity = uczelnieData.find(u => u.id === universityId);
     if (foundUniversity) {
         universityName = foundUniversity.nazwa;
     }
 
-    // Znajdź członków zespołu (osoby z danej uczelni)
+    // Find team members (people from the university)
     teamMembers = osobyData
         .filter(o => o.uczelnia === universityId)
         .map(o => `${o.imie} ${o.nazwisko}`);
@@ -106,13 +135,19 @@ app.post('/findTeamAndUni', (req, res) => {
         outputData += "Brak danych o członkach zespołu dla tej uczelni.";
     }
 
-     // Ograniczenie długości odpowiedzi
+    // Limit response length
     if (outputData.length > 1024) {
         outputData = outputData.substring(0, 1021) + "...";
     }
 
     console.log(`Odpowiedź /findTeamAndUni: ${outputData}`);
-    res.json({ output: outputData });
+    
+    // Return the correct format with "answer" action since we're providing the final result
+    res.json({
+        action: "usetool",
+        value: "tool1",
+        params: outputData
+    });
 });
 
 // Uruchomienie serwera
